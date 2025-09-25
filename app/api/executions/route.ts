@@ -38,6 +38,33 @@ function extractSessionData(execution: N8nExecution): { sessionId: string | null
       }
     }
 
+    // Chercher dans le node "gpt-4o" pour les réponses IA (workflow Sodiva)
+    if (!aiResponse) {
+      const gptNode = runData['gpt-4o'];
+      if (gptNode && Array.isArray(gptNode)) {
+        // Parcourir toutes les exécutions du node gpt-4o pour trouver celle avec une réponse
+        for (let i = gptNode.length - 1; i >= 0; i--) {
+          const execution = gptNode[i] as Record<string, unknown>;
+          const data = execution?.data as Record<string, unknown>;
+          const main = data?.ai_languageModel as unknown[][];
+          if (main?.[0]?.[0]) {
+            const gptData = main[0][0] as Record<string, unknown>;
+            const json = gptData.json as Record<string, unknown>;
+            const response = json?.response as Record<string, unknown>;
+            const generations = response?.generations as unknown[][];
+            if (generations?.[0]?.[0]) {
+              const generation = generations[0][0] as Record<string, unknown>;
+              const text = (generation?.text as string) || '';
+              if (text && text.trim().length > 0) {
+                aiResponse = text;
+                break; // Sortir de la boucle dès qu'on trouve une réponse valide
+              }
+            }
+          }
+        }
+      }
+    }
+
     // Fallback : chercher les anciens noms de nodes pour compatibilité
     if (!sessionId || !chatInput) {
       const chatNode = runData.chat;
