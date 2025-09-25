@@ -11,22 +11,22 @@ function extractSessionData(execution: N8nExecution): { sessionId: string | null
     let chatInput = null;
     let aiResponse = null;
 
-    // Chercher dans le node "chat"
-    const chatNode = runData.chat;
-    if (chatNode && Array.isArray(chatNode) && chatNode[0]) {
-      const nodeExecution = chatNode[0] as Record<string, unknown>;
+    // Chercher dans le node "When chat message received" pour sessionId et chatInput
+    const chatTriggerNode = runData['When chat message received'];
+    if (chatTriggerNode && Array.isArray(chatTriggerNode) && chatTriggerNode[0]) {
+      const nodeExecution = chatTriggerNode[0] as Record<string, unknown>;
       const data = nodeExecution?.data as Record<string, unknown>;
       const main = data?.main as unknown[][];
       if (main?.[0]?.[0]) {
-        const chatData = main[0][0] as Record<string, unknown>;
-        const json = chatData.json as Record<string, unknown>;
+        const triggerData = main[0][0] as Record<string, unknown>;
+        const json = triggerData.json as Record<string, unknown>;
         sessionId = (json?.sessionId as string) || null;
         chatInput = (json?.chatInput as string) || null;
       }
     }
 
-    // Chercher dans le node "lm-diffusion-agent"
-    const agentNode = runData['lm-diffusion-agent'];
+    // Chercher dans le node "decathlon-agent" pour la réponse IA
+    const agentNode = runData['decathlon-agent'];
     if (agentNode && Array.isArray(agentNode) && agentNode[0]) {
       const nodeExecution = agentNode[0] as Record<string, unknown>;
       const data = nodeExecution?.data as Record<string, unknown>;
@@ -35,6 +35,36 @@ function extractSessionData(execution: N8nExecution): { sessionId: string | null
         const agentData = main[0][0] as Record<string, unknown>;
         const json = agentData.json as Record<string, unknown>;
         aiResponse = (json?.output as string) || null;
+      }
+    }
+
+    // Fallback : chercher les anciens noms de nodes pour compatibilité
+    if (!sessionId || !chatInput) {
+      const chatNode = runData.chat;
+      if (chatNode && Array.isArray(chatNode) && chatNode[0]) {
+        const nodeExecution = chatNode[0] as Record<string, unknown>;
+        const data = nodeExecution?.data as Record<string, unknown>;
+        const main = data?.main as unknown[][];
+        if (main?.[0]?.[0]) {
+          const chatData = main[0][0] as Record<string, unknown>;
+          const json = chatData.json as Record<string, unknown>;
+          sessionId = sessionId || (json?.sessionId as string) || null;
+          chatInput = chatInput || (json?.chatInput as string) || null;
+        }
+      }
+    }
+
+    if (!aiResponse) {
+      const oldAgentNode = runData['lm-diffusion-agent'];
+      if (oldAgentNode && Array.isArray(oldAgentNode) && oldAgentNode[0]) {
+        const nodeExecution = oldAgentNode[0] as Record<string, unknown>;
+        const data = nodeExecution?.data as Record<string, unknown>;
+        const main = data?.main as unknown[][];
+        if (main?.[0]?.[0]) {
+          const agentData = main[0][0] as Record<string, unknown>;
+          const json = agentData.json as Record<string, unknown>;
+          aiResponse = (json?.output as string) || null;
+        }
       }
     }
 
