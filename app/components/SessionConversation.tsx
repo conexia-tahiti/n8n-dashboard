@@ -48,9 +48,16 @@ export default function SessionConversation({ session, onClose }: SessionConvers
           <h2 className="text-xl font-semibold text-gray-900">
             {session.sessionId}
           </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            {session.totalExecutions} message{session.totalExecutions > 1 ? 's' : ''}
-          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-sm text-gray-500">
+              {session.totalExecutions} message{session.totalExecutions > 1 ? 's' : ''}
+            </p>
+            {session.hasLeadTool && (
+              <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200">
+                🎯 Tool Lead utilisé
+              </span>
+            )}
+          </div>
           {/* Affichage compact des tags d'analyse dans le header */}
           {analysis && <CompactConversationTags analysis={analysis} />}
         </div>
@@ -134,6 +141,87 @@ export default function SessionConversation({ session, onClose }: SessionConvers
           <span>Total exécutions: {session.totalExecutions}</span>
         </div>
       </div>
+
+      {/* Section Leads générés */}
+      {session.hasLeadTool && session.leadExecutions && session.leadExecutions.length > 0 && (
+        <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 max-h-64 overflow-y-auto">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            🎯 Leads générés ({session.leadExecutions.length})
+          </h3>
+          <div className="space-y-3">
+            {session.leadExecutions.map((execution) => (
+              <div
+                key={execution.id}
+                className="bg-white border border-blue-200 rounded-lg p-4 shadow-sm"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-blue-600">
+                    {formatTimestamp(execution.startedAt)}
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                    Lead
+                  </span>
+                </div>
+                {execution.leadData && (
+                  <div className="space-y-2 text-sm">
+                    {execution.leadData.name && (
+                      <div>
+                        <span className="font-medium text-gray-700">Nom :</span>{' '}
+                        <span className="text-gray-900">{execution.leadData.name}</span>
+                      </div>
+                    )}
+                    {execution.leadData.email && (
+                      <div>
+                        <span className="font-medium text-gray-700">Email :</span>{' '}
+                        <span className="text-gray-900">{execution.leadData.email}</span>
+                      </div>
+                    )}
+                    {execution.leadData.phone && (
+                      <div>
+                        <span className="font-medium text-gray-700">Téléphone :</span>{' '}
+                        <span className="text-gray-900">{execution.leadData.phone}</span>
+                      </div>
+                    )}
+                    {execution.leadData.subject && (
+                      <div>
+                        <span className="font-medium text-gray-700">Sujet :</span>{' '}
+                        <span className="text-gray-900">{execution.leadData.subject}</span>
+                      </div>
+                    )}
+                    {execution.leadData.message && (
+                      <div>
+                        <span className="font-medium text-gray-700">Message :</span>
+                        <div className="mt-1 p-2 bg-gray-50 rounded border border-gray-200 text-gray-900 whitespace-pre-wrap">
+                          {execution.leadData.message}
+                        </div>
+                      </div>
+                    )}
+                    {/* Afficher d'autres champs personnalisés s'il y en a */}
+                    {Object.entries(execution.leadData).map(([key, value]) => {
+                      // Ne pas afficher les champs déjà affichés
+                      if (['name', 'email', 'phone', 'subject', 'message'].includes(key)) {
+                        return null;
+                      }
+                      if (value && typeof value === 'string') {
+                        return (
+                          <div key={key}>
+                            <span className="font-medium text-gray-700 capitalize">{key} :</span>{' '}
+                            <span className="text-gray-900">{value}</span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })}
+                  </div>
+                )}
+                {!execution.leadData && (
+                  <p className="text-sm text-gray-500 italic">Aucune donnée disponible</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

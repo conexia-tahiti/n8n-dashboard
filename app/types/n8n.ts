@@ -1,3 +1,12 @@
+export interface LeadData {
+  email?: string;
+  subject?: string;
+  message?: string;
+  name?: string;
+  phone?: string;
+  [key: string]: unknown; // Pour d'autres champs personnalisés
+}
+
 export interface N8nExecution {
   id: string;
   finished: boolean;
@@ -12,6 +21,8 @@ export interface N8nExecution {
   sessionId?: string | null;
   chatInput?: string;
   aiResponse?: string;
+  leadUsed?: boolean;
+  leadData?: LeadData;
   data?: {
     resultData?: {
       error?: unknown;
@@ -40,6 +51,8 @@ export interface ChatSession {
   lastActivity: string;
   totalExecutions: number;
   status: 'active' | 'inactive';
+  hasLeadTool?: boolean;
+  leadExecutions?: N8nExecution[];
 }
 
 export interface GroupedExecutionsResponse {

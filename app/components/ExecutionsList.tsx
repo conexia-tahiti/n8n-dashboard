@@ -191,8 +191,17 @@ export default function ExecutionsList({ onMetricsChange }: ExecutionsListProps)
                     )}
                   </div>
 
-                  <p className="text-sm text-gray-500 mb-1">
-                    {session.conversation.length} message{session.conversation.length > 1 ? 's' : ''} •
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-sm text-gray-500">
+                      {session.conversation.length} message{session.conversation.length > 1 ? 's' : ''}
+                    </p>
+                    {session.hasLeadTool && (
+                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200">
+                        🎯 Lead
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500">
                     Dernière activité: {formatDate(session.lastActivity)}
                   </p>
 

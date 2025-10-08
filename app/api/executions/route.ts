@@ -1,15 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { N8nExecution, ChatSession, GroupedExecutionsResponse } from '@/app/types/n8n';
+import { N8nExecution, ChatSession, GroupedExecutionsResponse, LeadData } from '@/app/types/n8n';
 
 // Fonction pour extraire le session ID, l'input du chat et la réponse IA depuis les runData
-function extractSessionData(execution: N8nExecution): { sessionId: string | null, chatInput: string | null, aiResponse: string | null } {
+function extractSessionData(execution: N8nExecution): { sessionId: string | null, chatInput: string | null, aiResponse: string | null, leadUsed: boolean, leadData: LeadData | null } {
   try {
     const runData = execution.data?.resultData?.runData as Record<string, unknown[]> | undefined;
-    if (!runData) return { sessionId: null, chatInput: null, aiResponse: null };
+    if (!runData) return { sessionId: null, chatInput: null, aiResponse: null, leadUsed: false, leadData: null };
 
     let sessionId = null;
     let chatInput = null;
     let aiResponse = null;
+    let leadUsed = false;
+    let leadData: LeadData | null = null;
+
+    // Détecter si le node "lead" existe dans runData (c'est un node séparé, pas un tool)
+    if (runData['lead']) {
+      leadUsed = true;
+      // Extraire les données du node lead
+      const leadNode = runData['lead'];
+      if (Array.isArray(leadNode) && leadNode[0]) {
+        const leadExecution = leadNode[0] as Record<string, unknown>;
+
+        // Les données du lead sont dans inputOverride, pas dans data
+        const inputOverride = leadExecution?.inputOverride as Record<string, unknown>;
+        const leadToolInput = inputOverride?.ai_tool as unknown[][];
+
+        if (leadToolInput?.[0]?.[0]) {
+          const leadInput = leadToolInput[0][0] as Record<string, unknown>;
+          const leadJson = leadInput.json as Record<string, unknown>;
+
+          // Le message contient souvent toutes les infos formatées
+          const message = leadJson?.Message as string || leadJson?.message as string;
+          const to = leadJson?.To as string;
+
+          // Extraire les champs principaux et exclure ceux qu'on a déjà mappés
+          const { To, Message, email, mail, subject, sujet, Subject, body, content, name, nom, phone, telephone, tel, ...otherFields } = leadJson;
+
+          // Extraire toutes les données du lead
+          leadData = {
+            email: to || email as string || mail as string,
+            subject: subject as string || sujet as string || Subject as string,
+            message: message || body as string || content as string,
+            name: name as string || nom as string,
+            phone: phone as string || telephone as string || tel as string,
+            ...otherFields // Inclure uniquement les autres champs non mappés
+          };
+        }
+      }
+    }
 
     // Chercher dans le node "When chat message received" pour sessionId et chatInput
     const chatTriggerNode = runData['When chat message received'];
@@ -25,8 +63,8 @@ function extractSessionData(execution: N8nExecution): { sessionId: string | null
       }
     }
 
-    // Chercher dans le node "decathlon-agent" pour la réponse IA
-    const agentNode = runData['decathlon-agent'];
+    // Priorité 1 : Chercher dans le node "ai-agent" pour la réponse IA et les tools
+    const agentNode = runData['ai-agent'];
     if (agentNode && Array.isArray(agentNode) && agentNode[0]) {
       const nodeExecution = agentNode[0] as Record<string, unknown>;
       const data = nodeExecution?.data as Record<string, unknown>;
@@ -38,11 +76,11 @@ function extractSessionData(execution: N8nExecution): { sessionId: string | null
       }
     }
 
-    // Chercher dans le node "gpt-4o" pour les réponses IA (workflow Sodiva)
+    // Priorité 2 : Chercher dans le node "gpt" si ai-agent n'a pas de réponse
     if (!aiResponse) {
-      const gptNode = runData['gpt-4o'];
+      const gptNode = runData['gpt'];
       if (gptNode && Array.isArray(gptNode)) {
-        // Parcourir toutes les exécutions du node gpt-4o pour trouver celle avec une réponse
+        // Parcourir toutes les exécutions du node gpt pour trouver celle avec une réponse
         for (let i = gptNode.length - 1; i >= 0; i--) {
           const execution = gptNode[i] as Record<string, unknown>;
           const data = execution?.data as Record<string, unknown>;
@@ -57,7 +95,7 @@ function extractSessionData(execution: N8nExecution): { sessionId: string | null
               const text = (generation?.text as string) || '';
               if (text && text.trim().length > 0) {
                 aiResponse = text;
-                break; // Sortir de la boucle dès qu'on trouve une réponse valide
+                break;
               }
             }
           }
@@ -65,40 +103,37 @@ function extractSessionData(execution: N8nExecution): { sessionId: string | null
       }
     }
 
-    // Fallback : chercher les anciens noms de nodes pour compatibilité
-    if (!sessionId || !chatInput) {
-      const chatNode = runData.chat;
-      if (chatNode && Array.isArray(chatNode) && chatNode[0]) {
-        const nodeExecution = chatNode[0] as Record<string, unknown>;
-        const data = nodeExecution?.data as Record<string, unknown>;
-        const main = data?.main as unknown[][];
-        if (main?.[0]?.[0]) {
-          const chatData = main[0][0] as Record<string, unknown>;
-          const json = chatData.json as Record<string, unknown>;
-          sessionId = sessionId || (json?.sessionId as string) || null;
-          chatInput = chatInput || (json?.chatInput as string) || null;
-        }
-      }
-    }
-
+    // Priorité 3 : Chercher dans le node "claude" si gpt n'a pas de réponse
     if (!aiResponse) {
-      const oldAgentNode = runData['lm-diffusion-agent'];
-      if (oldAgentNode && Array.isArray(oldAgentNode) && oldAgentNode[0]) {
-        const nodeExecution = oldAgentNode[0] as Record<string, unknown>;
-        const data = nodeExecution?.data as Record<string, unknown>;
-        const main = data?.main as unknown[][];
-        if (main?.[0]?.[0]) {
-          const agentData = main[0][0] as Record<string, unknown>;
-          const json = agentData.json as Record<string, unknown>;
-          aiResponse = (json?.output as string) || null;
+      const claudeNode = runData['claude'];
+      if (claudeNode && Array.isArray(claudeNode)) {
+        // Parcourir toutes les exécutions du node claude pour trouver celle avec une réponse
+        for (let i = claudeNode.length - 1; i >= 0; i--) {
+          const execution = claudeNode[i] as Record<string, unknown>;
+          const data = execution?.data as Record<string, unknown>;
+          const main = data?.ai_languageModel as unknown[][];
+          if (main?.[0]?.[0]) {
+            const claudeData = main[0][0] as Record<string, unknown>;
+            const json = claudeData.json as Record<string, unknown>;
+            const response = json?.response as Record<string, unknown>;
+            const generations = response?.generations as unknown[][];
+            if (generations?.[0]?.[0]) {
+              const generation = generations[0][0] as Record<string, unknown>;
+              const text = (generation?.text as string) || '';
+              if (text && text.trim().length > 0) {
+                aiResponse = text;
+                break;
+              }
+            }
+          }
         }
       }
     }
 
-    return { sessionId, chatInput, aiResponse };
+    return { sessionId, chatInput, aiResponse, leadUsed, leadData };
   } catch (error) {
     console.error('Error extracting session data:', error);
-    return { sessionId: null, chatInput: null, aiResponse: null };
+    return { sessionId: null, chatInput: null, aiResponse: null, leadUsed: false, leadData: null };
   }
 }
 
@@ -171,6 +206,11 @@ function groupExecutionsBySession(executions: N8nExecution[]): GroupedExecutions
     session.conversation.sort((a, b) =>
       new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
+
+    // Calculer hasLeadTool et leadExecutions
+    const leadExecutions = session.executions.filter(exec => exec.leadUsed === true);
+    session.hasLeadTool = leadExecutions.length > 0;
+    session.leadExecutions = leadExecutions.length > 0 ? leadExecutions : undefined;
   });
 
   return {
@@ -223,14 +263,16 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json();
 
-    // Enrichir chaque exécution avec sessionId, chatInput et aiResponse
+    // Enrichir chaque exécution avec sessionId, chatInput, aiResponse, leadUsed et leadData
     const enrichedExecutions: N8nExecution[] = data.data.map((execution: N8nExecution) => {
-      const { sessionId, chatInput, aiResponse } = extractSessionData(execution);
+      const { sessionId, chatInput, aiResponse, leadUsed, leadData } = extractSessionData(execution);
       return {
         ...execution,
         sessionId,
         chatInput,
-        aiResponse
+        aiResponse,
+        leadUsed,
+        leadData
       };
     });
 
