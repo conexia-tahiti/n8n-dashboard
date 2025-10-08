@@ -18,6 +18,7 @@ export default function ExecutionsList({ onMetricsChange }: ExecutionsListProps)
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedSession, setSelectedSession] = useState<ChatSession | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [showLeadsOnly, setShowLeadsOnly] = useState(false);
 
   // Calculate metrics using the custom hook
   const metrics = useMetrics(sessions, selectedMonth);
@@ -109,6 +110,16 @@ export default function ExecutionsList({ onMetricsChange }: ExecutionsListProps)
                   {status === 'all' ? 'Toutes' : status}
                 </button>
               ))}
+              <button
+                onClick={() => setShowLeadsOnly(!showLeadsOnly)}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                  showLeadsOnly
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                🎯 Leads uniquement
+              </button>
             </div>
 
             <div className="flex gap-2 items-center">
@@ -166,7 +177,7 @@ export default function ExecutionsList({ onMetricsChange }: ExecutionsListProps)
 
           <div className="space-y-3">
             {/* Sessions de chat */}
-            {sessions.map((session) => (
+            {(showLeadsOnly ? sessions.filter(session => session.hasLeadTool) : sessions).map((session) => (
               <div
                 key={session.sessionId}
                 className={`border rounded-lg bg-white cursor-pointer hover:shadow-md transition-all duration-200 ${

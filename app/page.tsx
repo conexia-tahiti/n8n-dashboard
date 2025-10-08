@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import ExecutionsList from './components/ExecutionsList';
 import { Metrics } from './hooks/useMetrics';
+import { LogoutButton } from './components/LogoutButton';
 
 export default function Home() {
   const [metrics, setMetrics] = useState<Metrics>({ totalMessages: 0, averageMessagesPerConversation: 0 });
@@ -52,10 +53,7 @@ export default function Home() {
               </div>
             )}
 
-            <div className="flex items-center space-x-2">
-              <div className="h-3 w-3 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-sm text-gray-600">Connecté</span>
-            </div>
+            <LogoutButton />
           </div>
         </div>
       </header>
