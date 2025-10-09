@@ -34,7 +34,8 @@ function extractSessionData(execution: N8nExecution): { sessionId: string | null
           const to = leadJson?.To as string;
 
           // Extraire les champs principaux et exclure ceux qu'on a déjà mappés
-          const { To, Message, email, mail, subject, sujet, Subject, body, content, name, nom, phone, telephone, tel, ...otherFields } = leadJson;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { To: _To, Message: _Message, email, mail, subject, sujet, Subject, body, content, name, nom, phone, telephone, tel, ...otherFields } = leadJson;
 
           // Extraire toutes les données du lead
           leadData = {
